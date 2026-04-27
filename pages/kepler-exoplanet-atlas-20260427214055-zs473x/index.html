@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; font-src 'self' data:; connect-src 'none'; media-src 'none'; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'"><meta name="generator" content="copilot-cowork-pages-mcp"><meta name="publish-policy" content="create-only"><script src="/cowork-visualizations/vendor/echarts/5.5.1/echarts.min.js"></script><script src="/cowork-visualizations/vendor/threejs/0.160.0/three.min.js"></script><link rel="stylesheet" href="/cowork-visualizations/vendor/tailwind/2.2.19/tailwind.min.css">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Kepler Exoplanet Atlas</title>
+  <style>
+    body { background: radial-gradient(ellipse at top, #1a1a2e 0%, #0a0a18 60%, #000 100%); min-height: 100vh; }
+    .glow { text-shadow: 0 0 18px rgba(126,231,135,.45); }
+    #scene canvas { display:block; width:100%; height:100%; cursor: grab; }
+    #scene canvas:active { cursor: grabbing; }
+    .pill { background: rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.08); }
+  </style>
+</head>
+<body class="bg-gray-950 text-gray-100 antialiased">
+  <main class="max-w-7xl mx-auto px-6 py-8 space-y-6">
+    <header class="space-y-2">
+      <p class="uppercase tracking-widest text-xs text-emerald-400">NASA Kepler mission &middot; 2009&ndash;2018</p>
+      <h1 class="text-4xl md:text-5xl font-bold glow leading-tight">An Atlas of Distant Worlds</h1>
+      <p class="text-gray-400 max-w-3xl">Twenty-two confirmed Kepler exoplanets, plotted by orbital period and radius, with a live 3D view of each host system. Click any point to travel.</p>
+    </header>
+
+    <section class="grid lg:grid-cols-5 gap-6">
+      <div class="lg:col-span-3 rounded-2xl bg-gray-900/70 ring-1 ring-white/10 p-5 shadow-2xl">
+        <div class="flex items-baseline justify-between mb-3 gap-2 flex-wrap">
+          <h2 class="text-lg font-semibold">Period vs radius</h2>
+          <p class="text-xs text-gray-400">Color = equilibrium temperature. Green band = habitable zone heuristic.</p>
+        </div>
+        <div id="chart" style="height:460px"></div>
+      </div>
+      <div class="lg:col-span-2 rounded-2xl bg-black/70 ring-1 ring-white/10 p-5 shadow-2xl flex flex-col">
+        <div class="flex items-baseline justify-between mb-3 gap-2 flex-wrap">
+          <h2 class="text-lg font-semibold"><span id="sys-name">Kepler-186</span> system</h2>
+          <p class="text-xs text-gray-400">Drag to rotate</p>
+        </div>
+        <div id="scene" class="flex-1 rounded-xl overflow-hidden ring-1 ring-white/5" style="min-height:460px"></div>
+      </div>
+    </section>
+
+    <section class="rounded-2xl bg-gray-900/70 ring-1 ring-white/10 p-6 shadow-2xl">
+      <p class="text-emerald-400 text-xs uppercase tracking-widest">Selected planet</p>
+      <div class="flex items-baseline justify-between gap-3 flex-wrap mt-1">
+        <h3 id="p-name" class="text-3xl font-bold">Kepler-186f</h3>
+        <span id="p-tag" class="pill rounded-full px-3 py-1 text-xs text-emerald-300">First Earth-size HZ planet</span>
+      </div>
+      <div class="grid grid-cols-2 md:grid-cols-5 gap-4 mt-5 text-sm">
+        <div><div class="text-gray-500 text-xs uppercase tracking-wider">Radius</div><div id="p-radius" class="text-lg font-semibold mt-1">&mdash;</div></div>
+        <div><div class="text-gray-500 text-xs uppercase tracking-wider">Orbital period</div><div id="p-period" class="text-lg font-semibold mt-1">&mdash;</div></div>
+        <div><div class="text-gray-500 text-xs uppercase tracking-wider">Equilibrium temp</div><div id="p-temp" class="text-lg font-semibold mt-1">&mdash;</div></div>
+        <div><div class="text-gray-500 text-xs uppercase tracking-wider">Distance from Earth</div><div id="p-dist" class="text-lg font-semibold mt-1">&mdash;</div></div>
+        <div><div class="text-gray-500 text-xs uppercase tracking-wider">Host star</div><div id="p-star" class="text-lg font-semibold mt-1">&mdash;</div></div>
+      </div>
+      <p id="p-note" class="text-gray-300 mt-5 leading-relaxed">&nbsp;</p>
+      <p class="text-xs text-gray-500 mt-4">Equilibrium temperature assumes a planetary albedo of 0.3 and is sourced from NASA Exoplanet Archive. Light-year distances rounded.</p>
+    </section>
+
+    <section class="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+      <div class="pill rounded-xl p-3"><div class="text-gray-400">Planets shown</div><div class="text-2xl font-bold mt-1">22</div></div>
+      <div class="pill rounded-xl p-3"><div class="text-gray-400">Host systems</div><div class="text-2xl font-bold mt-1">11</div></div>
+      <div class="pill rounded-xl p-3"><div class="text-gray-400">Smallest</div><div class="text-2xl font-bold mt-1">0.30 R&oplus;</div><div class="text-gray-500 mt-1">Kepler-37b</div></div>
+      <div class="pill rounded-xl p-3"><div class="text-gray-400">Most Earth-like (ESI)</div><div class="text-2xl font-bold mt-1">Kepler-442b</div></div>
+    </section>
+  </main>
+
+  <script>
+    var planets = [
+      {name:"Kepler-186b",sys:"Kepler-186",period:3.887,radius:1.07,temp:601,dist:580,starT:3788,tag:"M-dwarf inner",note:"Innermost planet of the first system found with an Earth-size habitable-zone world. Likely scorched and rocky."},
+      {name:"Kepler-186c",sys:"Kepler-186",period:7.267,radius:1.25,temp:478,dist:580,starT:3788,tag:"M-dwarf inner",note:"A warm super-Earth orbiting a cool red dwarf, well inside the habitable zone."},
+      {name:"Kepler-186d",sys:"Kepler-186",period:13.343,radius:1.39,temp:362,dist:580,starT:3788,tag:"M-dwarf",note:"A tidally interesting middle world; likely too warm for surface liquid water."},
+      {name:"Kepler-186e",sys:"Kepler-186",period:22.408,radius:1.27,temp:286,dist:580,starT:3788,tag:"Near HZ",note:"Sits just inside the inner edge of its star's habitable zone."},
+      {name:"Kepler-186f",sys:"Kepler-186",period:129.944,radius:1.17,temp:188,dist:580,starT:3788,tag:"Earth-size HZ",note:"The first Earth-size planet ever confirmed in the habitable zone of another star (NASA Ames, 2014)."},
+
+      {name:"Kepler-62b",sys:"Kepler-62",period:5.715,radius:1.31,temp:750,dist:1200,starT:4925,tag:"K-dwarf hot",note:"Hot inner super-Earth in a remarkable five-planet K-dwarf system."},
+      {name:"Kepler-62c",sys:"Kepler-62",period:12.441,radius:0.54,temp:578,dist:1200,starT:4925,tag:"Mars-size",note:"A small, dense Mars-size world only slightly larger than our own Mars."},
+      {name:"Kepler-62d",sys:"Kepler-62",period:18.164,radius:1.95,temp:510,dist:1200,starT:4925,tag:"Sub-Neptune",note:"Likely a steamy sub-Neptune or ocean world with a thick water envelope."},
+      {name:"Kepler-62e",sys:"Kepler-62",period:122.387,radius:1.61,temp:270,dist:1200,starT:4925,tag:"HZ super-Earth",note:"Inside the habitable zone; possibly a covered ocean world (Kasting et al., 2013)."},
+      {name:"Kepler-62f",sys:"Kepler-62",period:267.291,radius:1.41,temp:208,dist:1200,starT:4925,tag:"HZ outer",note:"Outermost rocky candidate in Kepler-62; cold but plausibly habitable with a CO_2 greenhouse."},
+
+      {name:"Kepler-22b",sys:"Kepler-22",period:289.862,radius:2.40,temp:262,dist:638,starT:5518,tag:"First HZ confirmation",note:"The first transiting planet confirmed in the habitable zone of a Sun-like star (December 2011)."},
+
+      {name:"Kepler-452b",sys:"Kepler-452",period:384.84,radius:1.63,temp:265,dist:1402,starT:5757,tag:"Earth's cousin",note:"Often called Earth's older, larger cousin: G-type host, ~385-day year, 1.63 R-earth."},
+
+      {name:"Kepler-90g",sys:"Kepler-90",period:210.60,radius:8.13,temp:290,dist:2545,starT:6080,tag:"Gas giant",note:"Penultimate world in the eight-planet Kepler-90 system, the first matching our Solar System's planet count."},
+      {name:"Kepler-90h",sys:"Kepler-90",period:331.60,radius:11.32,temp:230,dist:2545,starT:6080,tag:"Jupiter-class",note:"A Jupiter-size outer giant, completing the 8-planet Kepler-90 system (the i planet was found via deep learning, 2017)."},
+
+      {name:"Kepler-10b",sys:"Kepler-10",period:0.837,radius:1.47,temp:1833,dist:564,starT:5708,tag:"First rocky",note:"The first unambiguously rocky exoplanet confirmed by Kepler (January 2011). Lava-blasted dayside."},
+      {name:"Kepler-10c",sys:"Kepler-10",period:45.294,radius:2.35,temp:583,dist:564,starT:5708,tag:"Mega-Earth",note:"A surprisingly dense ~17 Earth-mass world; nicknamed the mega-Earth when characterized in 2014."},
+
+      {name:"Kepler-444b",sys:"Kepler-444",period:3.600,radius:0.40,temp:1010,dist:117,starT:5046,tag:"Ancient system",note:"One of five sub-Earth worlds orbiting an 11.2-billion-year-old K-dwarf, the oldest known planetary system."},
+      {name:"Kepler-444f",sys:"Kepler-444",period:9.741,radius:0.74,temp:730,dist:117,starT:5046,tag:"Ancient sub-Earth",note:"The outermost of Kepler-444's five tightly packed sub-Earth-size planets."},
+
+      {name:"Kepler-9b",sys:"Kepler-9",period:19.243,radius:9.40,temp:800,dist:2120,starT:5777,tag:"First TTV pair",note:"Saturn-class giant in the first Kepler-confirmed multi-planet system (transit-timing variations, 2010)."},
+      {name:"Kepler-9c",sys:"Kepler-9",period:38.910,radius:9.18,temp:600,dist:2120,starT:5777,tag:"TTV partner",note:"Locked in a 1:2 mean-motion resonance with Kepler-9b; their gravitational tug-of-war confirmed both."},
+
+      {name:"Kepler-37b",sys:"Kepler-37",period:13.367,radius:0.30,temp:700,dist:215,starT:5417,tag:"Smaller than Mercury",note:"Smaller than Mercury and barely larger than Earth's Moon. The smallest planet around a Sun-like star at the time of its discovery (2013)."},
+
+      {name:"Kepler-138d",sys:"Kepler-138",period:23.088,radius:1.21,temp:281,dist:219,starT:3841,tag:"Possible water world",note:"Once thought Mars-size; later analyses suggest a steamy water-rich envelope around an M-dwarf-warmed core."},
+
+      {name:"Kepler-442b",sys:"Kepler-442",period:112.305,radius:1.34,temp:233,dist:1206,starT:4402,tag:"High ESI",note:"Among the most Earth-like Kepler discoveries by Earth Similarity Index. Cool K-dwarf host, modest insolation."}
+    ];
+
+    var systems = {};
+    planets.forEach(function(p){
+      if(!systems[p.sys]) systems[p.sys] = {name:p.sys, starT:p.starT, dist:p.dist, planets:[]};
+      systems[p.sys].planets.push(p);
+    });
+
+    function tempColor(t){
+      if(t < 220) return "#60a5fa";
+      if(t < 290) return "#34d399";
+      if(t < 400) return "#fbbf24";
+      if(t < 800) return "#f97316";
+      return "#ef4444";
+    }
+    function tempColorHex(t){
+      if(t < 220) return 0x60a5fa;
+      if(t < 290) return 0x34d399;
+      if(t < 400) return 0xfbbf24;
+      if(t < 800) return 0xf97316;
+      return 0xef4444;
+    }
+    function starColor(t){
+      if(t < 3700) return 0xff7e4d;
+      if(t < 4500) return 0xffb074;
+      if(t < 5500) return 0xfde68a;
+      if(t < 6200) return 0xfff7e0;
+      return 0xc7d2fe;
+    }
+
+    var chart = echarts.init(document.getElementById("chart"), null, {renderer:"canvas"});
+    var seriesData = planets.map(function(p, i){
+      return {value:[p.period, p.radius, p.temp, p.name], idx:i, itemStyle:{color: tempColor(p.temp)}};
+    });
+    chart.setOption({
+      backgroundColor: "transparent",
+      grid: {left:64, right:24, top:24, bottom:56},
+      xAxis: {
+        type:"log", name:"Orbital period (days)", nameLocation:"middle", nameGap:36,
+        axisLabel:{color:"#94a3b8"}, nameTextStyle:{color:"#cbd5f5"},
+        splitLine:{lineStyle:{color:"#1e293b"}}, axisLine:{lineStyle:{color:"#334155"}}
+      },
+      yAxis: {
+        type:"log", name:"Planet radius (R-earth)", nameLocation:"middle", nameGap:42,
+        axisLabel:{color:"#94a3b8"}, nameTextStyle:{color:"#cbd5f5"},
+        splitLine:{lineStyle:{color:"#1e293b"}}, axisLine:{lineStyle:{color:"#334155"}}
+      },
+      tooltip: {
+        backgroundColor:"#0f172a", borderColor:"#334155", borderWidth:1,
+        textStyle:{color:"#e2e8f0"},
+        formatter: function(p){
+          return "[" + p.value[3] + "]<br>"
+            + "Period: " + p.value[0].toFixed(p.value[0]<10?2:1) + " days<br>"
+            + "Radius: " + p.value[1].toFixed(2) + " R-earth<br>"
+            + "T_eq: " + p.value[2] + " K";
+        }
+      },
+      visualMap: {
+        show: true, min: 180, max: 1900, dimension: 2, calculable: false,
+        inRange: {color: ["#60a5fa","#34d399","#fbbf24","#f97316","#ef4444"]},
+        text: ["1900K","180K"], textStyle:{color:"#94a3b8"},
+        right: 8, top: 30, itemHeight: 140
+      },
+      series: [{
+        type:"scatter",
+        symbolSize: function(v){ return Math.max(8, Math.min(40, Math.sqrt(v[1]) * 12)); },
+        data: seriesData,
+        emphasis: {itemStyle:{shadowBlur:20, shadowColor:"rgba(126,231,135,0.6)"}},
+        markArea: {
+          silent:true,
+          itemStyle:{color:"rgba(52,211,153,0.07)", borderColor:"rgba(52,211,153,0.25)", borderWidth:1},
+          data: [[{xAxis:50, yAxis:0.6, name:"Habitable zone"}, {xAxis:500, yAxis:2.5}]]
+        }
+      }]
+    });
+    chart.on("click", function(e){ if(e && e.data) selectPlanet(e.data.idx); });
+    window.addEventListener("resize", function(){ chart.resize(); });
+
+    var sceneEl = document.getElementById("scene");
+    var renderer = new THREE.WebGLRenderer({antialias:true, alpha:true});
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    sceneEl.appendChild(renderer.domElement);
+    var scene = new THREE.Scene();
+    scene.fog = new THREE.FogExp2(0x000010, 0.0028);
+    var camera = new THREE.PerspectiveCamera(48, 1, 0.1, 800);
+    var ambient = new THREE.AmbientLight(0x202848, 0.55);
+    scene.add(ambient);
+
+    var starfield;
+    (function buildStarfield(){
+      var geo = new THREE.BufferGeometry();
+      var arr = [];
+      for (var i = 0; i < 1800; i++) {
+        var r = 180 + Math.random() * 220;
+        var theta = Math.random() * Math.PI * 2;
+        var phi = Math.acos(2*Math.random() - 1);
+        arr.push(r*Math.sin(phi)*Math.cos(theta), r*Math.sin(phi)*Math.sin(theta), r*Math.cos(phi));
+      }
+      geo.setAttribute("position", new THREE.Float32BufferAttribute(arr, 3));
+      var mat = new THREE.PointsMaterial({color:0xaabbff, size:0.6, sizeAttenuation:true, transparent:true, opacity:0.85});
+      starfield = new THREE.Points(geo, mat);
+      scene.add(starfield);
+    })();
+
+    var systemGroup = new THREE.Group();
+    scene.add(systemGroup);
+    var orbitObjects = [];
+    var currentSysName = null;
+    var pointLight = null;
+
+    function buildSystem(sysName){
+      while (systemGroup.children.length) {
+        var c = systemGroup.children[0];
+        systemGroup.remove(c);
+        if (c.geometry) c.geometry.dispose();
+        if (c.material) c.material.dispose && c.material.dispose();
+      }
+      orbitObjects = [];
+      var s = systems[sysName];
+      if (!s) return;
+      currentSysName = sysName;
+      document.getElementById("sys-name").textContent = sysName;
+
+      var sc = starColor(s.starT);
+      var star = new THREE.Mesh(
+        new THREE.SphereGeometry(2.2, 40, 40),
+        new THREE.MeshBasicMaterial({color: sc})
+      );
+      systemGroup.add(star);
+      systemGroup.add(new THREE.Mesh(
+        new THREE.SphereGeometry(2.9, 40, 40),
+        new THREE.MeshBasicMaterial({color: sc, transparent:true, opacity:0.18})
+      ));
+      systemGroup.add(new THREE.Mesh(
+        new THREE.SphereGeometry(3.6, 40, 40),
+        new THREE.MeshBasicMaterial({color: sc, transparent:true, opacity:0.07})
+      ));
+      pointLight = new THREE.PointLight(sc, 2.0, 0, 1.4);
+      systemGroup.add(pointLight);
+
+      var ps = s.planets.slice().sort(function(a,b){ return a.period - b.period; });
+      var maxLog = Math.log(Math.max.apply(null, ps.map(function(p){return p.period;})) + 1);
+      ps.forEach(function(p, i){
+        var r = 4.5 + i * 2.6 + Math.log(p.period+1) / maxLog * 4.0;
+        var ringGeo = new THREE.RingGeometry(r-0.025, r+0.025, 128);
+        var ringMat = new THREE.MeshBasicMaterial({color:0x475569, side:THREE.DoubleSide, transparent:true, opacity:0.55});
+        var ring = new THREE.Mesh(ringGeo, ringMat);
+        ring.rotation.x = -Math.PI/2;
+        systemGroup.add(ring);
+
+        var pSize = Math.max(0.28, Math.min(1.55, Math.cbrt(p.radius) * 0.55));
+        var col = tempColorHex(p.temp);
+        var planetMesh = new THREE.Mesh(
+          new THREE.SphereGeometry(pSize, 28, 28),
+          new THREE.MeshStandardMaterial({color: col, roughness:0.65, metalness:0.05, emissive: col, emissiveIntensity:0.18})
+        );
+        var phase = Math.random() * Math.PI * 2;
+        systemGroup.add(planetMesh);
+        orbitObjects.push({mesh:planetMesh, ring:ring, r:r, period:p.period, phase:phase, data:p});
+      });
+
+      camera.position.set(0, 14, 32);
+      camera.lookAt(0, 0, 0);
+    }
+
+    var camYaw = 0;
+    var camPitch = 0.45;
+    var camDist = 36;
+    function updateCamera(){
+      var x = Math.cos(camPitch) * Math.sin(camYaw) * camDist;
+      var z = Math.cos(camPitch) * Math.cos(camYaw) * camDist;
+      var y = Math.sin(camPitch) * camDist;
+      camera.position.set(x, y, z);
+      camera.lookAt(0, 0, 0);
+    }
+
+    var dragging = false, dragX = 0, dragY = 0;
+    sceneEl.addEventListener("pointerdown", function(e){ dragging = true; dragX = e.clientX; dragY = e.clientY; sceneEl.setPointerCapture && sceneEl.setPointerCapture(e.pointerId); });
+    sceneEl.addEventListener("pointerup", function(){ dragging = false; });
+    sceneEl.addEventListener("pointercancel", function(){ dragging = false; });
+    sceneEl.addEventListener("pointermove", function(e){
+      if (!dragging) return;
+      camYaw -= (e.clientX - dragX) * 0.01;
+      camPitch += (e.clientY - dragY) * 0.006;
+      camPitch = Math.max(0.05, Math.min(1.4, camPitch));
+      dragX = e.clientX; dragY = e.clientY;
+      updateCamera();
+    });
+
+    function resizeScene(){
+      var w = sceneEl.clientWidth, h = sceneEl.clientHeight;
+      if (w === 0 || h === 0) return;
+      renderer.setSize(w, h, false);
+      camera.aspect = w / h;
+      camera.updateProjectionMatrix();
+    }
+
+    var t0 = performance.now();
+    function tick(){
+      var t = (performance.now() - t0) / 1000;
+      orbitObjects.forEach(function(o){
+        var speed = 1.6 / Math.pow(Math.max(o.period, 1), 0.55) * 6;
+        var ang = o.phase + t * speed;
+        o.mesh.position.set(Math.cos(ang) * o.r, 0, Math.sin(ang) * o.r);
+        o.mesh.rotation.y += 0.01;
+      });
+      starfield.rotation.y += 0.0004;
+      renderer.render(scene, camera);
+      requestAnimationFrame(tick);
+    }
+
+    function selectPlanet(idx){
+      var p = planets[idx];
+      if (!p) return;
+      if (p.sys !== currentSysName) buildSystem(p.sys);
+      document.getElementById("p-name").textContent = p.name;
+      document.getElementById("p-tag").textContent = p.tag;
+      document.getElementById("p-radius").textContent = p.radius.toFixed(2) + " R-earth";
+      document.getElementById("p-period").textContent = p.period.toFixed(p.period < 10 ? 2 : 1) + " days";
+      document.getElementById("p-temp").textContent = p.temp + " K";
+      document.getElementById("p-dist").textContent = p.dist + " ly";
+      document.getElementById("p-star").textContent = p.starT + " K (" + (p.starT < 3900 ? "M-dwarf" : p.starT < 5300 ? "K-dwarf" : p.starT < 6000 ? "G-type" : "F/G-type") + ")";
+      document.getElementById("p-note").textContent = p.note;
+      orbitObjects.forEach(function(o){
+        var hit = o.data.name === p.name;
+        o.ring.material.color.setHex(hit ? 0x34d399 : 0x475569);
+        o.ring.material.opacity = hit ? 0.95 : 0.55;
+        o.mesh.material.emissiveIntensity = hit ? 0.55 : 0.18;
+      });
+    }
+
+    resizeScene();
+    window.addEventListener("resize", resizeScene);
+    updateCamera();
+    selectPlanet(4);
+    tick();
+  </script>
+</body>
+</html>

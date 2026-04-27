@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; font-src 'self' data:; connect-src 'none'; media-src 'none'; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'"><meta name="generator" content="copilot-cowork-pages-mcp"><meta name="publish-policy" content="create-only"><script src="/cowork-visualizations/vendor/threejs/0.160.0/three.min.js"></script><script src="/cowork-visualizations/vendor/echarts/5.5.1/echarts.min.js"></script><link rel="stylesheet" href="/cowork-visualizations/vendor/tailwind/2.2.19/tailwind.min.css">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>The Elephant Transformer</title>
+  <style>
+    body { background: radial-gradient(ellipse at top, #1c1c2e 0%, #0a0a18 60%, #000 100%); min-height: 100vh; }
+    .glow-text { text-shadow: 0 0 18px rgba(244,191,118,.45); }
+    #scene canvas { display:block; width:100%; height:100%; cursor: grab; }
+    #scene canvas:active { cursor: grabbing; }
+    .pill { background: rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.08); }
+    .stage-btn { transition: background .15s ease, border-color .15s ease; }
+    .stage-btn:hover { background: rgba(244,191,118,.10); }
+    .stage-btn.active { background: rgba(244,191,118,.18); border-color: rgba(244,191,118,.55); }
+    input[type=range] { accent-color: #fbbf24; }
+  </style>
+</head>
+<body class="bg-gray-950 text-gray-100 antialiased">
+  <main class="max-w-7xl mx-auto px-6 py-8 space-y-6">
+    <header class="space-y-2">
+      <p class="uppercase tracking-widest text-xs text-amber-300">A mechanism in six parts</p>
+      <h1 class="text-4xl md:text-5xl font-bold glow-text leading-tight">The Elephant Transformer</h1>
+      <p class="text-gray-400 max-w-3xl">The Transformer architecture as an elephant. Trunk for input, anklets for position, ears for attention, spine for residuals, belly-forge for feed-forward, tusks for output. Drag to rotate, scroll to zoom, and follow the token through the herd.</p>
+    </header>
+
+    <section class="grid lg:grid-cols-5 gap-6">
+      <div class="lg:col-span-3 rounded-2xl bg-black/70 ring-1 ring-white/10 p-5 shadow-2xl flex flex-col">
+        <div class="flex items-baseline justify-between mb-3 gap-2 flex-wrap">
+          <h2 class="text-lg font-semibold">Mechanism viewport</h2>
+          <p class="text-xs text-gray-400">Drag &middot; scroll &middot; click a stage</p>
+        </div>
+        <div id="scene" class="flex-1 rounded-xl overflow-hidden ring-1 ring-white/5" style="min-height:520px"></div>
+      </div>
+
+      <div class="lg:col-span-2 space-y-4">
+        <div class="rounded-2xl bg-gray-900/70 ring-1 ring-white/10 p-5">
+          <p class="text-amber-300 text-xs uppercase tracking-widest">Stages</p>
+          <div id="stage-buttons" class="flex flex-col gap-2 mt-3"></div>
+        </div>
+        <div class="rounded-2xl bg-gray-900/70 ring-1 ring-white/10 p-5">
+          <p class="text-amber-300 text-xs uppercase tracking-widest">Selected stage</p>
+          <h3 id="stage-name" class="text-2xl font-bold mt-1">&mdash;</h3>
+          <p id="stage-tag" class="text-amber-300/80 text-sm mt-1">&mdash;</p>
+          <p id="stage-desc" class="text-gray-300 mt-3 leading-relaxed text-sm">&nbsp;</p>
+          <div class="grid grid-cols-2 gap-3 mt-4 text-xs">
+            <div class="pill rounded-lg p-3"><div class="text-gray-500 uppercase tracking-wider">Maps to</div><div id="stage-maps" class="text-sm font-medium mt-1 text-gray-200">&mdash;</div></div>
+            <div class="pill rounded-lg p-3"><div class="text-gray-500 uppercase tracking-wider">Why an elephant?</div><div id="stage-why" class="text-sm font-medium mt-1 text-gray-200">&mdash;</div></div>
+          </div>
+        </div>
+        <div class="rounded-2xl bg-gray-900/70 ring-1 ring-white/10 p-5">
+          <div class="flex items-center justify-between mb-3 gap-3">
+            <p class="text-amber-300 text-xs uppercase tracking-widest">Token playhead</p>
+            <button id="play-btn" type="button" class="pill rounded-full px-3 py-1 text-xs hover:bg-white/10">Play</button>
+          </div>
+          <input id="play-slider" type="range" min="0" max="1000" value="0" class="w-full">
+          <p class="text-gray-500 text-xs mt-2">Scrub the glowing token through the body to follow information through one Transformer layer.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="rounded-2xl bg-gray-900/70 ring-1 ring-white/10 p-6 shadow-2xl">
+      <div class="flex items-baseline justify-between mb-2 gap-2 flex-wrap">
+        <h2 class="text-lg font-semibold">Multi-head attention</h2>
+        <p class="text-xs text-gray-400">Eight ears listening to <span class="text-amber-300">"the elephant slowly walked through the savanna at dusk"</span></p>
+      </div>
+      <div id="heatmap" style="height:360px"></div>
+      <p class="text-xs text-gray-500 mt-3">Heads specialize: some attend to positional neighbors, some to subject-verb-object roles, some to long-range or temporal anchors. Pattern is illustrative, not from a real model.</p>
+    </section>
+  </main>
+
+  <script>
+    var stages = [
+      {id:0, name:"Input Trunk", tag:"Embedding", maps:"Token embedding lookup", why:"The trunk reaches out and grasps tokens.",
+       desc:"Each token is fetched from the vocabulary and lifted into a learned dense vector. The trunk is the elephant's tool for picking things up; here it picks up discrete IDs and lifts them into vector space.",
+       color:0x60a5fa},
+      {id:1, name:"Positional Anklets", tag:"Positional encoding", maps:"Sinusoidal or learned position vectors", why:"Anklets jingle in rhythm with each step.",
+       desc:"Position information is added so the model can reason about order. Each step the elephant takes lays down a positional pattern, the way sinusoidal embeddings cycle through the sequence.",
+       color:0xa78bfa},
+      {id:2, name:"Attention Ears", tag:"Multi-head attention", maps:"Query-Key-Value across heads", why:"Big ears listen in many directions at once.",
+       desc:"Each token attends to every other token across multiple heads. The ears unfurl into eight listening surfaces, each focusing on a different relationship: nearby words, syntactic peers, distant references.",
+       color:0xfbbf24},
+      {id:3, name:"Residual Spine", tag:"Skip connection", maps:"x + Sublayer(x), then LayerNorm", why:"The spine carries the body's original shape forward.",
+       desc:"The original representation is added back after each sublayer, preserving information and stabilizing training. The spine never gets lost, no matter how loud the ears or how hot the forge.",
+       color:0x34d399},
+      {id:4, name:"Belly Forge", tag:"Feed-forward", maps:"Two-layer MLP with nonlinearity", why:"A warm furnace transforms what arrives.",
+       desc:"A position-wise MLP applies a heavy nonlinear transformation to each token's vector. The forge in the belly heats and reshapes whatever the ears delivered.",
+       color:0xf97316},
+      {id:5, name:"Output Tusks", tag:"Logits projection", maps:"Linear-then-softmax over vocabulary", why:"The tusks project the choice into the world.",
+       desc:"The final hidden state is projected into vocabulary-size logits and turned into a next-token distribution. Two tusks, the only outward-facing parts, deliver the prediction from the herd inside.",
+       color:0xef4444}
+    ];
+
+    function colorHex(n){ return "#" + n.toString(16).padStart(6, "0"); }
+    function setText(id, t){ document.getElementById(id).textContent = t; }
+
+    var stageContainer = document.getElementById("stage-buttons");
+    stages.forEach(function(s, i){
+      var btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "stage-btn pill rounded-lg p-3 text-left";
+      btn.innerHTML =
+        "<div class=\"flex items-center gap-3\">" +
+          "<span class=\"w-2.5 h-2.5 rounded-full\" style=\"background:" + colorHex(s.color) + "\"></span>" +
+          "<div><div class=\"font-medium\">" + s.name + "</div>" +
+          "<div class=\"text-xs text-gray-400\">" + s.tag + "</div></div>" +
+        "</div>";
+      btn.addEventListener("click", function(){ selectStage(i, true); });
+      stageContainer.appendChild(btn);
+    });
+
+    var currentStage = -1;
+    function selectStage(i, snap){
+      currentStage = i;
+      var s = stages[i];
+      setText("stage-name", s.name);
+      setText("stage-tag", s.tag);
+      setText("stage-desc", s.desc);
+      setText("stage-maps", s.maps);
+      setText("stage-why", s.why);
+      Array.prototype.forEach.call(stageContainer.children, function(c, j){
+        c.classList.toggle("active", j === i);
+      });
+      bodyParts.forEach(function(p){
+        var hit = (p.stage === i);
+        p.mat.emissive = new THREE.Color(hit ? s.color : 0x000000);
+        p.mat.emissiveIntensity = hit ? 0.55 : 0;
+      });
+      if (snap) {
+        playT = i / (stages.length - 1);
+        document.getElementById("play-slider").value = Math.round(playT * 1000);
+      }
+    }
+
+    var sceneEl = document.getElementById("scene");
+    var renderer = new THREE.WebGLRenderer({antialias:true, alpha:true});
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    sceneEl.appendChild(renderer.domElement);
+    var scene = new THREE.Scene();
+    scene.fog = new THREE.FogExp2(0x000010, 0.018);
+    var camera = new THREE.PerspectiveCamera(45, 1, 0.1, 200);
+    scene.add(new THREE.AmbientLight(0x404060, 0.55));
+    var keyLight = new THREE.DirectionalLight(0xfff6e0, 0.95);
+    keyLight.position.set(6, 9, 5);
+    scene.add(keyLight);
+    var rimLight = new THREE.DirectionalLight(0x88aaff, 0.45);
+    rimLight.position.set(-6, 4, -5);
+    scene.add(rimLight);
+
+    (function(){
+      var g = new THREE.CircleGeometry(16, 64);
+      var m = new THREE.MeshStandardMaterial({color:0x1a1a2e, roughness:0.95, metalness:0});
+      var ground = new THREE.Mesh(g, m);
+      ground.rotation.x = -Math.PI/2;
+      ground.position.y = -2.6;
+      scene.add(ground);
+    })();
+
+    (function(){
+      var geo = new THREE.BufferGeometry();
+      var arr = [];
+      for (var i = 0; i < 500; i++) {
+        var r = 28 + Math.random() * 22;
+        var th = Math.random() * Math.PI * 2;
+        var ph = Math.acos(2*Math.random()-1);
+        arr.push(r*Math.sin(ph)*Math.cos(th), Math.abs(r*Math.cos(ph))*0.6, r*Math.sin(ph)*Math.sin(th));
+      }
+      geo.setAttribute("position", new THREE.Float32BufferAttribute(arr, 3));
+      var mat = new THREE.PointsMaterial({color:0xaabbff, size:0.14, transparent:true, opacity:0.75});
+      scene.add(new THREE.Points(geo, mat));
+    })();
+
+    var elephant = new THREE.Group();
+    scene.add(elephant);
+    var bodyParts = [];
+    var skinColor = 0xb2a89a;
+    function skinMat(){ return new THREE.MeshStandardMaterial({color: skinColor, roughness:0.85, metalness:0.05}); }
+
+    var body = new THREE.Mesh(new THREE.BoxGeometry(4.4, 2.3, 2.0), skinMat());
+    body.position.set(-0.1, -0.25, 0);
+    elephant.add(body);
+
+    var head = new THREE.Mesh(new THREE.BoxGeometry(1.7, 1.6, 1.7), skinMat());
+    head.position.set(2.55, 0.18, 0);
+    elephant.add(head);
+
+    var trunkGroup = new THREE.Group();
+    elephant.add(trunkGroup);
+    var trunkPts = [];
+    var trunkSegs = 11;
+    for (var i = 0; i <= trunkSegs; i++) {
+      var t = i / trunkSegs;
+      var x = 3.35 + t * 1.55;
+      var y = -0.05 - Math.sin(t * Math.PI * 0.78) * 1.35;
+      trunkPts.push(new THREE.Vector3(x, y, 0));
+    }
+    var trunkMat = new THREE.MeshStandardMaterial({color: skinColor, roughness:0.85, metalness:0.05});
+    for (var i = 0; i < trunkPts.length - 1; i++) {
+      var mid = trunkPts[i].clone().add(trunkPts[i+1]).multiplyScalar(0.5);
+      var seg = new THREE.Mesh(new THREE.SphereGeometry(0.42 - i*0.024, 16, 16), trunkMat);
+      seg.position.copy(mid);
+      trunkGroup.add(seg);
+    }
+    bodyParts.push({mesh:trunkGroup, mat:trunkMat, stage:0});
+
+    var tuskMat = new THREE.MeshStandardMaterial({color:0xf6e8c5, roughness:0.4, metalness:0.15, emissive:0x000000, emissiveIntensity:0});
+    function makeTusk(side){
+      var m = new THREE.Mesh(new THREE.ConeGeometry(0.14, 1.5, 14), tuskMat);
+      m.position.set(2.95, -0.55, side * 0.45);
+      m.rotation.x = side * 0.35;
+      m.rotation.z = -1.05;
+      return m;
+    }
+    var tusksGroup = new THREE.Group();
+    tusksGroup.add(makeTusk(1));
+    tusksGroup.add(makeTusk(-1));
+    elephant.add(tusksGroup);
+    bodyParts.push({mesh:tusksGroup, mat:tuskMat, stage:5});
+
+    var earsGroup = new THREE.Group();
+    var earMatL = new THREE.MeshStandardMaterial({color:0xa89281, roughness:0.7, metalness:0.05, side:THREE.DoubleSide, emissive:0x000000, emissiveIntensity:0});
+    var earMatR = new THREE.MeshStandardMaterial({color:0xa89281, roughness:0.7, metalness:0.05, side:THREE.DoubleSide, emissive:0x000000, emissiveIntensity:0});
+    function makeEar(side, mat){
+      var ear = new THREE.Mesh(new THREE.SphereGeometry(1.05, 24, 24), mat);
+      ear.position.set(2.2, 0.65, side * 0.95);
+      ear.scale.set(0.32, 1.15, 0.95);
+      ear.rotation.z = side * 0.25;
+      return ear;
+    }
+    var earL = makeEar(1, earMatL);
+    var earR = makeEar(-1, earMatR);
+    earsGroup.add(earL); earsGroup.add(earR);
+    elephant.add(earsGroup);
+    bodyParts.push({mesh:earsGroup, mat:earMatL, stage:2});
+    bodyParts.push({mesh:earsGroup, mat:earMatR, stage:2});
+
+    var ankletMat = new THREE.MeshStandardMaterial({color:0xa78bfa, roughness:0.3, metalness:0.7, emissive:0x000000, emissiveIntensity:0});
+    var ankletGroup = new THREE.Group();
+    var legPos = [[1.35,-1.45,0.65],[1.35,-1.45,-0.65],[-1.35,-1.45,0.65],[-1.35,-1.45,-0.65]];
+    legPos.forEach(function(pos){
+      var leg = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.34, 1.55, 16), skinMat());
+      leg.position.set(pos[0], pos[1], pos[2]);
+      elephant.add(leg);
+      var anklet = new THREE.Mesh(new THREE.TorusGeometry(0.36, 0.06, 12, 24), ankletMat);
+      anklet.position.set(pos[0], pos[1] - 0.65, pos[2]);
+      anklet.rotation.x = Math.PI / 2;
+      ankletGroup.add(anklet);
+    });
+    elephant.add(ankletGroup);
+    bodyParts.push({mesh:ankletGroup, mat:ankletMat, stage:1});
+
+    var tail = new THREE.Group();
+    for (var i = 0; i < 6; i++) {
+      var t = i / 5;
+      var seg = new THREE.Mesh(new THREE.SphereGeometry(0.16 - t*0.04, 12, 12), skinMat());
+      seg.position.set(-2.4 - t*0.6, -0.15 - Math.sin(t*Math.PI*0.5)*0.55, 0);
+      tail.add(seg);
+    }
+    elephant.add(tail);
+
+    var spineMat = new THREE.MeshStandardMaterial({color:0x34d399, roughness:0.4, metalness:0.5, transparent:true, opacity:0.92, emissive:0x000000, emissiveIntensity:0});
+    var spinePts = [];
+    for (var i = 0; i <= 16; i++) {
+      var t = i / 16;
+      var x = -2.0 + t * 4.4;
+      var y = 0.95 + Math.sin(t * Math.PI) * 0.12;
+      spinePts.push(new THREE.Vector3(x, y, 0));
+    }
+    var spineCurve = new THREE.CatmullRomCurve3(spinePts);
+    var spineMesh = new THREE.Mesh(new THREE.TubeGeometry(spineCurve, 64, 0.10, 12, false), spineMat);
+    var spineGroup = new THREE.Group();
+    spineGroup.add(spineMesh);
+    elephant.add(spineGroup);
+    bodyParts.push({mesh:spineGroup, mat:spineMat, stage:3});
+
+    var forgeMat = new THREE.MeshStandardMaterial({color:0xf97316, emissive:0xff5500, emissiveIntensity:0.0, roughness:0.4, metalness:0.2, transparent:true, opacity:0.92});
+    var forge = new THREE.Mesh(new THREE.SphereGeometry(0.85, 32, 32), forgeMat);
+    forge.position.set(-0.3, -0.5, 0);
+    elephant.add(forge);
+    var forgeGlow = new THREE.PointLight(0xff7a33, 0.0, 5, 2);
+    forge.add(forgeGlow);
+    var forgeGroup = new THREE.Group();
+    forgeGroup.add(forge);
+    bodyParts.push({mesh:forgeGroup, mat:forgeMat, stage:4});
+
+    [1, -1].forEach(function(s){
+      var eye = new THREE.Mesh(new THREE.SphereGeometry(0.08, 8, 8), new THREE.MeshBasicMaterial({color:0x111111}));
+      eye.position.set(2.92, 0.45, s * 0.55);
+      elephant.add(eye);
+    });
+
+    var token = new THREE.Mesh(
+      new THREE.SphereGeometry(0.18, 24, 24),
+      new THREE.MeshStandardMaterial({color:0xf4bf76, emissive:0xf4bf76, emissiveIntensity:0.85, roughness:0.4})
+    );
+    scene.add(token);
+    token.add(new THREE.PointLight(0xf4bf76, 1.0, 4.5, 2));
+
+    function tokenPath(t){
+      var p = new THREE.Vector3();
+      if (t < 0.15) {
+        var u = t / 0.15;
+        p.lerpVectors(trunkPts[trunkPts.length - 1], new THREE.Vector3(2.55, 0.18, 0), u);
+      } else if (t < 0.18) {
+        var u = (t - 0.15) / 0.03;
+        p.lerpVectors(new THREE.Vector3(2.55, 0.18, 0), new THREE.Vector3(1.35, -2.1, 0), u);
+      } else if (t < 0.32) {
+        var u = (t - 0.18) / 0.14;
+        var ang = u * Math.PI * 2;
+        p.set(Math.cos(ang) * 1.9, -2.1 + Math.sin(ang * 2) * 0.05, 0);
+      } else if (t < 0.55) {
+        var u = (t - 0.32) / 0.23;
+        var lobe = (u < 0.5) ? 1 : -1;
+        var localU = (u < 0.5) ? u * 2 : (u - 0.5) * 2;
+        var lang = localU * Math.PI * 2;
+        p.set(2.2 + Math.cos(lang) * 0.15, 0.65 + Math.sin(lang) * 0.85, lobe * 0.95);
+      } else if (t < 0.72) {
+        var u = (t - 0.55) / 0.17;
+        var pos = spineCurve.getPoint(1 - Math.abs(2 * u - 1));
+        p.copy(pos);
+      } else if (t < 0.86) {
+        var u = (t - 0.72) / 0.14;
+        var ang = u * Math.PI * 4;
+        p.set(-0.3 + Math.cos(ang) * 0.7, -0.5 + Math.sin(ang * 0.5) * 0.25, Math.sin(ang) * 0.7);
+      } else {
+        var u = (t - 0.86) / 0.14;
+        p.lerpVectors(new THREE.Vector3(2.55, 0.18, 0), new THREE.Vector3(4.1, -0.95, 0.0), u);
+      }
+      return p;
+    }
+
+    function setTokenPosition(t){
+      token.position.copy(tokenPath(t));
+      var inForge = (t > 0.70 && t < 0.88);
+      forgeMat.emissiveIntensity = inForge ? 0.6 : (currentStage === 4 ? 0.4 : 0.0);
+      forgeGlow.intensity = inForge ? 1.2 : (currentStage === 4 ? 0.8 : 0.0);
+      var inAnklets = (t > 0.18 && t < 0.32);
+      ankletMat.emissive = new THREE.Color((inAnklets || currentStage === 1) ? 0xa78bfa : 0x000000);
+      ankletMat.emissiveIntensity = inAnklets ? 0.7 : (currentStage === 1 ? 0.55 : 0.0);
+    }
+
+    var camYaw = 0.7, camPitch = 0.22, camDist = 11.5;
+    function updateCamera(){
+      var x = Math.cos(camPitch) * Math.sin(camYaw) * camDist;
+      var z = Math.cos(camPitch) * Math.cos(camYaw) * camDist;
+      var y = Math.sin(camPitch) * camDist + 0.3;
+      camera.position.set(x, y, z);
+      camera.lookAt(0, 0, 0);
+    }
+    var dragging = false, dragX = 0, dragY = 0;
+    sceneEl.addEventListener("pointerdown", function(e){ dragging = true; dragX = e.clientX; dragY = e.clientY; sceneEl.setPointerCapture && sceneEl.setPointerCapture(e.pointerId); });
+    sceneEl.addEventListener("pointerup", function(){ dragging = false; });
+    sceneEl.addEventListener("pointercancel", function(){ dragging = false; });
+    sceneEl.addEventListener("pointermove", function(e){
+      if (!dragging) return;
+      camYaw -= (e.clientX - dragX) * 0.01;
+      camPitch += (e.clientY - dragY) * 0.006;
+      camPitch = Math.max(-0.4, Math.min(1.2, camPitch));
+      dragX = e.clientX; dragY = e.clientY;
+      updateCamera();
+    });
+    sceneEl.addEventListener("wheel", function(e){
+      e.preventDefault();
+      camDist = Math.max(6.5, Math.min(22, camDist + e.deltaY * 0.01));
+      updateCamera();
+    }, {passive:false});
+
+    function resizeScene(){
+      var w = sceneEl.clientWidth, h = sceneEl.clientHeight;
+      if (!w || !h) return;
+      renderer.setSize(w, h, false);
+      camera.aspect = w / h;
+      camera.updateProjectionMatrix();
+    }
+    resizeScene();
+    window.addEventListener("resize", resizeScene);
+    updateCamera();
+
+    var playT = 0;
+    var playing = false;
+    var slider = document.getElementById("play-slider");
+    var playBtn = document.getElementById("play-btn");
+    slider.addEventListener("input", function(){ playT = slider.value / 1000; playing = false; playBtn.textContent = "Play"; });
+    playBtn.addEventListener("click", function(){
+      playing = !playing;
+      playBtn.textContent = playing ? "Pause" : "Play";
+    });
+
+    var lastFrame = performance.now();
+    function tick(){
+      var now = performance.now();
+      var dt = (now - lastFrame) / 1000;
+      lastFrame = now;
+      if (playing) {
+        playT += dt * 0.13;
+        if (playT > 1) playT = 0;
+        slider.value = Math.round(playT * 1000);
+      }
+      setTokenPosition(playT);
+      if (playing) {
+        var stageByT = Math.min(stages.length - 1, Math.floor(playT * stages.length));
+        if (stageByT !== currentStage) selectStage(stageByT, false);
+      }
+      elephant.position.y = Math.sin(now * 0.0014) * 0.04;
+      earL.rotation.z = 0.25 + Math.sin(now * 0.003) * 0.06;
+      earR.rotation.z = -0.25 - Math.sin(now * 0.003) * 0.06;
+      tail.rotation.z = Math.sin(now * 0.002) * 0.07;
+      renderer.render(scene, camera);
+      requestAnimationFrame(tick);
+    }
+
+    selectStage(0, false);
+    tick();
+
+    var heatmap = echarts.init(document.getElementById("heatmap"), null, {renderer:"canvas"});
+    var tokens = ["the","elephant","slowly","walked","through","the","savanna","at","dusk"];
+    var heads = ["H1 positional","H2 subject","H3 verb","H4 object","H5 manner","H6 location","H7 long-range","H8 self"];
+    var headDescriptions = [
+      "Attends to immediate neighbors (a positional bias)",
+      "Anchors on the subject \"elephant\"",
+      "Anchors on the verb \"walked\"",
+      "Anchors on the object \"savanna\"",
+      "Picks up modifiers (slowly, dusk)",
+      "Picks up location/path (through, savanna)",
+      "Reverses sequence: end attends to start",
+      "Self-attention diagonal"
+    ];
+    var hData = [];
+    var rng = (function(seed){ return function(){ seed = (seed * 9301 + 49297) % 233280; return seed / 233280; }; })(7);
+    var patterns = [
+      function(i,j){ return Math.exp(-Math.pow(i-j, 2) / 2.2); },
+      function(i,j){ return (j === 1) ? 1.0 : 0.05 + 0.08 * rng(); },
+      function(i,j){ return (j === 3) ? 0.95 : 0.05 + 0.06 * rng(); },
+      function(i,j){ return (j === 6) ? 0.9 : 0.05 + 0.06 * rng(); },
+      function(i,j){ return (j === 2 || j === 8) ? 0.75 : 0.04 + 0.05 * rng(); },
+      function(i,j){ return (j === 4 || j === 6) ? 0.78 : 0.05 + 0.05 * rng(); },
+      function(i,j,n){ return Math.exp(-Math.pow(j - (n - 1 - i), 2) / 8); },
+      function(i,j){ return (j === i) ? 0.7 : 0.06 + 0.05 * rng(); }
+    ];
+    var yLabels = [];
+    for (var h = 0; h < heads.length; h++) {
+      for (var i = 0; i < tokens.length; i++) {
+        yLabels.push(heads[h] + " : " + tokens[i]);
+        var maxv = 0;
+        var row = [];
+        for (var j = 0; j < tokens.length; j++) {
+          var v = patterns[h](i, j, tokens.length);
+          row.push(v);
+          if (v > maxv) maxv = v;
+        }
+        for (var j = 0; j < tokens.length; j++) {
+          hData.push([j, h * tokens.length + i, +(row[j] / maxv).toFixed(3)]);
+        }
+      }
+    }
+    heatmap.setOption({
+      backgroundColor:"transparent",
+      tooltip:{
+        backgroundColor:"#0f172a", borderColor:"#334155",
+        textStyle:{color:"#e2e8f0"},
+        formatter: function(p){
+          var col = p.value[0];
+          var rowIdx = p.value[1];
+          var headIdx = Math.floor(rowIdx / tokens.length);
+          var srcIdx = rowIdx % tokens.length;
+          return "[" + heads[headIdx] + "]<br>"
+            + headDescriptions[headIdx] + "<br>"
+            + "<span style=\"color:#fbbf24\">" + tokens[srcIdx] + "</span>"
+            + " &rarr; <span style=\"color:#34d399\">" + tokens[col] + "</span><br>"
+            + "weight: " + p.value[2].toFixed(2);
+        }
+      },
+      grid:{left:140, right:30, top:24, bottom:60},
+      xAxis:{
+        type:"category", data:tokens, position:"top",
+        axisLabel:{color:"#cbd5f5", fontSize:11},
+        axisLine:{lineStyle:{color:"#334155"}},
+        splitArea:{show:false}
+      },
+      yAxis:{
+        type:"category", data:yLabels, inverse:true,
+        axisLabel:{color:"#fbbf24", fontSize:10, formatter: function(v, idx){
+          return (idx % tokens.length === Math.floor(tokens.length / 2)) ? heads[Math.floor(idx / tokens.length)] : "";
+        }},
+        axisLine:{lineStyle:{color:"#334155"}},
+        splitArea:{show:true, areaStyle:{color:["rgba(255,255,255,0.012)","rgba(255,255,255,0.03)"]}}
+      },
+      visualMap:{
+        min:0, max:1, calculable:false, orient:"horizontal", left:"center", bottom:6,
+        textStyle:{color:"#94a3b8"},
+        inRange:{color:["#0a0a18","#3b1d12","#7c2d12","#f97316","#fbbf24","#fef3c7"]}
+      },
+      series:[{
+        type:"heatmap",
+        data:hData,
+        progressive:0,
+        itemStyle:{borderColor:"rgba(255,255,255,.04)", borderWidth:0.5}
+      }]
+    });
+    window.addEventListener("resize", function(){ heatmap.resize(); });
+  </script>
+</body>
+</html>

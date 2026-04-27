@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head><meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; font-src 'self' data:; connect-src 'none'; media-src 'none'; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'"><meta name="generator" content="copilot-cowork-pages-mcp"><meta name="publish-policy" content="create-only"><script src="/cowork-visualizations/vendor/echarts/5.5.1/echarts.min.js"></script><link rel="stylesheet" href="/cowork-visualizations/vendor/tailwind/2.2.19/tailwind.min.css">
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Framework smoke test: ECharts</title>
+  </head>
+  <body class="bg-gray-900 text-gray-100 antialiased">
+    <main class="max-w-4xl mx-auto p-8 space-y-6">
+      <header class="space-y-2">
+        <p class="uppercase tracking-widest text-xs text-emerald-400">Framework smoke test</p>
+        <h1 class="text-3xl font-bold">ECharts + Tailwind injection</h1>
+        <p class="text-gray-400">If you can see a styled bar chart below, the same-origin framework allowlist, vendor path prefix, and CSP are all wired up correctly.</p>
+      </header>
+      <section class="rounded-2xl bg-gray-800/70 p-6 shadow-xl ring-1 ring-white/5">
+        <h2 class="text-lg font-semibold mb-4">Sample workload distribution</h2>
+        <div id="chart" class="w-full" style="height: 360px;"></div>
+      </section>
+      <footer class="text-xs text-gray-500 pt-4">Published via the cowork-visualizations MCP server.</footer>
+    </main>
+    <script>
+      var chart = echarts.init(document.getElementById('chart'));
+      chart.setOption({
+        backgroundColor: 'transparent',
+        tooltip: { trigger: 'axis' },
+        grid: { left: 40, right: 24, top: 24, bottom: 40 },
+        xAxis: {
+          type: 'category',
+          data: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'],
+          axisLabel: { color: '#cbd5f5' },
+          axisLine: { lineStyle: { color: '#475569' } }
+        },
+        yAxis: {
+          type: 'value',
+          axisLabel: { color: '#cbd5f5' },
+          splitLine: { lineStyle: { color: '#1f2937' } }
+        },
+        series: [{
+          type: 'bar',
+          data: [12, 18, 9, 22, 16],
+          itemStyle: {
+            color: { type: 'linear', x: 0, y: 0, x2: 0, y2: 1, colorStops: [
+              { offset: 0, color: '#34d399' },
+              { offset: 1, color: '#0ea5e9' }
+            ] },
+            borderRadius: [6, 6, 0, 0]
+          }
+        }]
+      });
+      window.addEventListener('resize', function () { chart.resize(); });
+    </script>
+  </body>
+</html>
